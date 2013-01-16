@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -18,10 +19,26 @@ var (
 	expWidth  = 240 // expected width of the image
 	expHeight = 240 // expected height of the image
 	expSquare = 60  // expected side of the subsquares of the image
+	xCoords   = []int{0, 60, 120, 180}
+	yCoords   = []int{0, 60, 120, 180}
+	L         = len(yCoords) * len(xCoords)
 )
 
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
+
+}
+
+func toSquare(x, y int) int {
+	return x + len(xCoords)*y
+}
+
+func fromSquare(s int) (x, y int) {
+	return (s % 4) * expSquare, (s / len(xCoords)) * expSquare
+}
+
+func fromWide(s int) (x, y int) {
+	return 0, s * expSquare
 }
 
 func main() {
@@ -46,106 +63,105 @@ func main() {
 	}
 	verifyBounds(m)
 
-	// count := 0
-	// for y := 0; y < expWidth; y += expSquare {
-	// 	for x := 0; x < expHeight; x += expSquare {
-	// 		sp := image.Pt(x, y)
-	// 		outFile := fmt.Sprintf("poop-%d.jpg", count)
-	// 		log.Printf("generating %v...\n", outFile)
-	// 		getSquare(m, sp, outFile)
-	// 		count++
-	// 	}
-	// }
+	table := make(map[int]int, L)
+	for s := 0; s < L; s++ {
+		best := computeBest(s, m)
+		table[s] = best
+	}
 
-	log.Printf("total: %v\n", total(m))
-
-	out := m
-	min := total(m)
-	for i := 0; i < 1000000; i++ {
-		out = scramble(out)
-		d := total(out)
-		if d < min {
-			min = d
-			outFile := fmt.Sprintf("poop-%f.jpg", min)
-			toFile(out, outFile)
+	W := len(xCoords)
+	out := image.NewRGBA(image.Rect(0, 0, W*expSquare, L*expSquare))
+	for v := 0; v < L; v++ {
+		thisOne := v
+		for h := 0; h < len(xCoords); h++ {
+			r := image.Rect(h*expSquare, v*expSquare, (h+1)*expSquare, (v+1)*expSquare)
+			if h > 0 {
+				thisOne = table[thisOne]
+			}
+			bx, by := fromSquare(thisOne)
+			draw.Draw(out, r, m, image.Pt(bx, by), draw.Src)
 		}
 	}
+
+	table2 := make(map[int]int, L)
+	for s := 0; s < L; s++ {
+		best := computeBestWide(s, out)
+		log.Printf("%v -> %v\n", s, best)
+		table2[s] = best
+	}
+
+	out2 := image.NewRGBA(image.Rect(0, 0, W*L*expSquare, len(yCoords)*expSquare))
+	for h := 0; h < L; h++ {
+		thisOne := h
+		for v := 0; v < W; v++ {
+			r := image.Rect(h*expSquare*W, v*expSquare, (h+1)*expSquare*W, (v+1)*expSquare)
+			if h > 0 {
+				thisOne = table2[thisOne]
+			}
+			bx, by := fromWide(thisOne)
+			draw.Draw(out2, r, out, image.Pt(bx, by), draw.Src)
+		}
+	}
+	name := strings.Split(imgFile, ".")[0]
+	outFile := fmt.Sprintf("%v-descrambled.jpg", name)
+	log.Println(outFile)
+	toFile(out2, outFile)
 }
 
-func scramble(m image.Image) image.Image {
-	out := image.NewRGBA(image.Rect(0, 0, expWidth, expHeight))
+func computeBestWide(s int, m image.Image) int {
+	sy := (s+1)*expSquare - 1 // bottom of selected
+	var min float64
+	var best int = -1
+	for i := 0; i < L; i++ {
+		if i != s {
+			// compare the two
+			y := i * expSquare // top of comparison rect
+			//log.Printf("comparing %v (%v,%v) and %v (%v, %v)... ", s, sx, sy, i, x, y)
+			v := make([]float64, expSquare*len(xCoords))
+			for i, _ := range v {
+				d := colorDist(m.At(i, sy), m.At(i, y))
+				v[i] = d
+			}
 
-	// first scramble vertically
-	v := make([]int, expWidth/expSquare)
-	for i, _ := range v {
-		v[i] = i * expSquare
+			// now, see the distance
+			D := dist(v)
+			//log.Printf("%v ", D)
+			if D < min || min == 0 {
+				min = D
+				best = i
+				//log.Printf("MIN!\n")
+			}
+		}
 	}
-	shuffle(v)
-	fmt.Printf("%v\n", v)
-	for i, x := range v {
-		draw.Draw(out, image.Rect(x, 0, x+expSquare, expHeight), m, image.Pt(i*expSquare, 0), draw.Src)
-	}
-	//toFile(out, "poopie.jpg")
-
-	// then scramble horizontally
-	out2 := image.NewRGBA(image.Rect(0, 0, expWidth, expHeight))
-	v = make([]int, expHeight/expSquare)
-	for i, _ := range v {
-		v[i] = i * expSquare
-	}
-	shuffle(v)
-	fmt.Printf("%v\n", v)
-	for i, y := range v {
-		draw.Draw(out2, image.Rect(0, y, expWidth, y+expSquare), out, image.Pt(0, i*expSquare), draw.Src)
-	}
-
-	//toFile(out2, "poopie.jpg")
-	return out2
+	return best
 }
 
-func shuffle(v []int) {
-	n := len(v)
-	for i := 0; i < n; i++ {
-		j := rand.Intn(n-i) + i
-		v[i], v[j] = v[j], v[i]
-	}
-}
+func computeBest(s int, m image.Image) int {
+	sx, sy := fromSquare(s)
+	var min float64
+	var best int = -1
+	for i := 0; i < len(xCoords)*len(yCoords); i++ {
+		if i != s {
+			// compare the two
+			x, y := fromSquare(i)
+			//log.Printf("comparing %v (%v,%v) and %v (%v, %v)... ", s, sx, sy, i, x, y)
+			v := make([]float64, expSquare)
+			for i, _ := range v {
+				d := colorDist(m.At(sx+expSquare-1, sy+i), m.At(x, y+i))
+				v[i] = d
+			}
 
-func total(m image.Image) (result float64) {
-	for x := 60; x < expWidth; x += expSquare {
-		r := vDist(m, x)
-		log.Printf("v: %v", r)
-		result += r * r
+			// now, see the distance
+			D := dist(v)
+			//log.Printf("%v ", D)
+			if D < min || min == 0 {
+				min = D
+				best = i
+				//log.Printf("MIN!\n")
+			}
+		}
 	}
-	for y := 60; y < expHeight; y += expSquare {
-		r := hDist(m, y)
-		log.Printf("h: %v", r)
-		result += r * r
-	}
-	return math.Sqrt(result)
-}
-
-func vDist(m image.Image, x int) float64 {
-	if x < expSquare || x >= expWidth {
-		log.Fatal("vCoord is wrong")
-	}
-	squares := make([]float64, 0, expHeight)
-	for y := 0; y < expHeight; y++ {
-		squares = append(squares, colorDist(m.At(x-1, y), m.At(x, y)))
-	}
-
-	return dist(squares)
-}
-
-func hDist(m image.Image, y int) float64 {
-	if y < expSquare || y >= expHeight {
-		log.Fatal("hCoord is wrong")
-	}
-	squares := make([]float64, 0, expWidth)
-	for x := 0; x < expWidth; x++ {
-		squares = append(squares, colorDist(m.At(x, y-1), m.At(x, y)))
-	}
-	return dist(squares)
+	return best
 }
 
 func colorDist(c1, c2 color.Color) float64 {
@@ -160,20 +176,6 @@ func dist(v []float64) (result float64) {
 		result += p * p
 	}
 	return math.Sqrt(result)
-}
-
-func getSquare(m image.Image, sp image.Point, outFile string) {
-	out := image.NewRGBA(image.Rect(0, 0, expSquare, expSquare))
-	draw.Draw(out, out.Bounds(), m, sp, draw.Src)
-
-	w, err := os.OpenFile(outFile, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		log.Fatalf("could not open file for writing: %v\n", outFile)
-	}
-	defer w.Close()
-
-	opts := &jpeg.Options{100}
-	jpeg.Encode(w, out, opts)
 }
 
 func toFile(m image.Image, outFile string) {
