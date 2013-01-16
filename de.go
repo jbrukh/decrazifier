@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"image"
 	"log"
 	"os"
@@ -11,9 +10,9 @@ import (
 )
 
 var (
-	expWidth  = 240
-	expHeight = 240
-	expSquare = 60
+	expWidth  = 240 // expected width of the image
+	expHeight = 240 // expected height of the image
+	expSquare = 60  // expected side of the subsquares of the image
 )
 
 func main() {
@@ -21,12 +20,11 @@ func main() {
 
 	args := flag.Args()
 	if len(args) < 1 {
-		fmt.Println("usage: de [file]")
-		os.Exit(1)
+		log.Fatal("usage: de [file]")
 	}
 	imgFile := args[0]
 
-	fmt.Printf("opening %v...\n", imgFile)
+	log.Printf("opening %v...\n", imgFile)
 	file, err := os.Open(imgFile)
 	if err != nil {
 		log.Fatalf("could not open file %v (%v)", imgFile, err)
@@ -40,9 +38,14 @@ func main() {
 	verifyBounds(m)
 }
 
+// verifyBounds checks to see if the image has the expected
+// size and sub-square properties.
 func verifyBounds(m image.Image) {
 	b := m.Bounds()
 	if b.Max.Y != expHeight || b.Max.X != expWidth || b.Min.X != 0 || b.Min.Y != 0 {
 		log.Fatal("unexpected bounds")
+	}
+	if expWidth%expSquare != 0 || expHeight%expSquare != 0 {
+		log.Fatal("squares do not exhaust the image")
 	}
 }
