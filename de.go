@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"image"
+	"image/draw"
 	"log"
 	"os"
 
-	_ "image/jpeg"
+	"image/jpeg"
 )
 
 var (
@@ -36,6 +37,21 @@ func main() {
 		log.Fatal(err)
 	}
 	verifyBounds(m)
+	getFirstSquare(m, "output.jpeg")
+}
+
+func getFirstSquare(m image.Image, outFile string) {
+	out := image.NewRGBA(image.Rect(0, 0, expSquare, expSquare))
+	draw.Draw(out, out.Bounds(), m, image.ZP, draw.Src)
+
+	w, err := os.OpenFile(outFile, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		log.Fatalf("could not open file for writing: %v\n", outFile)
+	}
+	defer w.Close()
+
+	opts := &jpeg.Options{100}
+	jpeg.Encode(w, out, opts)
 }
 
 // verifyBounds checks to see if the image has the expected
