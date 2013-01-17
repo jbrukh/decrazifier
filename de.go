@@ -83,10 +83,12 @@ func main() {
 		}
 	}
 
+	toFile(out, "poopie.jpg")
+
 	table2 := make(map[int]int, L)
 	for s := 0; s < L; s++ {
 		best := computeBestWide(s, out)
-		log.Printf("%v -> %v\n", s, best)
+		log.Printf("wide: %v -> %v\n", s, best)
 		table2[s] = best
 	}
 
@@ -95,7 +97,7 @@ func main() {
 		thisOne := h
 		for v := 0; v < W; v++ {
 			r := image.Rect(h*expSquare*W, v*expSquare, (h+1)*expSquare*W, (v+1)*expSquare)
-			if h > 0 {
+			if v > 0 {
 				thisOne = table2[thisOne]
 			}
 			bx, by := fromWide(thisOne)
