@@ -237,7 +237,8 @@ func (s *ScrambledImage) Strip(tile int) *Strip {
 func distance(c1, c2 color.Color) float64 {
 	r1, g1, b1, a1 := c1.RGBA()
 	r2, g2, b2, a2 := c2.RGBA()
-	sum := float64(uint64((r1-r2)*(r1-r2)) + uint64((g1-g2)*(g1-g2)) + uint64((b1-b2)*(b1-b2)) + uint64((a1-a2)*(a1-a2)))
+	sum := float64(uint64((r1-r2)*(r1-r2)) + uint64((g1-g2)*(g1-g2)) +
+		uint64((b1-b2)*(b1-b2)) + uint64((a1-a2)*(a1-a2)))
 	return math.Sqrt(sum)
 }
 
@@ -271,7 +272,8 @@ func process(file io.Reader) {
 		strips = append(strips, strip)
 		log.Printf("%v\n", strip)
 		for j := 0; j < Horizontal; j++ {
-			draw.Draw(m, image.Rect(j*Side, i*Side, (j+1)*Side, (i+1)*Side), s.m, Tile(strip.seq[j]).Min, draw.Src)
+			draw.Draw(m, image.Rect(j*Side, i*Side, (j+1)*Side, (i+1)*Side),
+				s.m, Tile(strip.seq[j]).Min, draw.Src)
 		}
 	}
 	toFile(m, "jake.jpg")
