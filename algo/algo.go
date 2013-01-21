@@ -243,7 +243,7 @@ func Distance(c1, c2 color.Color) float64 {
 func Decrazify(file io.Reader, w io.Writer) error {
 	s, err := NewScrambledImage(file)
 	if err != nil {
-		log.Fatalf("Could not convert file: %v\n", err.Error())
+		return fmt.Errorf("Could not convert file: %v\n", err.Error())
 	}
 
 	/* m := image.NewRGBA(image.Rect(0, 0, Width, Total*Side)) */
