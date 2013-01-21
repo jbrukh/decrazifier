@@ -1,7 +1,6 @@
-package main
+package algo
 
 import (
-	"flag"
 	"fmt"
 	"image"
 	"image/color"
@@ -10,7 +9,6 @@ import (
 	"io"
 	"log"
 	"math"
-	"os"
 )
 
 const (
@@ -133,7 +131,7 @@ func (s *ScrambledImage) CompareTiles(a int, aEdge *Edge, b int, bEdge *Edge) fl
 			break
 		}
 		bPt := <-bCh
-		sum += distance(aPt, bPt)
+		sum += Distance(aPt, bPt)
 	}
 	return sum
 }
@@ -234,7 +232,7 @@ func (s *ScrambledImage) Strip(tile int) *Strip {
 }
 
 // calculates the Euclidean distance between two colors
-func distance(c1, c2 color.Color) float64 {
+func Distance(c1, c2 color.Color) float64 {
 	r1, g1, b1, a1 := c1.RGBA()
 	r2, g2, b2, a2 := c2.RGBA()
 	sum := float64(uint64((r1-r2)*(r1-r2)) + uint64((g1-g2)*(g1-g2)) +
@@ -242,58 +240,34 @@ func distance(c1, c2 color.Color) float64 {
 	return math.Sqrt(sum)
 }
 
-func main() {
-	flag.Parse()
-
-	args := flag.Args()
-	if len(args) < 1 {
-		log.Fatal("usage: de [file]")
-	}
-	imgFile := args[0]
-
-	file, err := os.Open(imgFile)
-	if err != nil {
-		log.Fatalf("Could not open file: %v\n", err.Error())
-	}
-
-	process(file)
-}
-
-func process(file io.Reader) {
+func Decrazify(file io.Reader, w io.Writer) error {
 	s, err := NewScrambledImage(file)
 	if err != nil {
 		log.Fatalf("Could not convert file: %v\n", err.Error())
 	}
 
-	m := image.NewRGBA(image.Rect(0, 0, Width, Total*Side))
+	/* m := image.NewRGBA(image.Rect(0, 0, Width, Total*Side)) */
 	strips := make([]*Strip, 0, Total)
 	for i := 0; i < Total; i++ {
 		strip := s.Strip(i)
 		strips = append(strips, strip)
 		log.Printf("%v\n", strip)
-		for j := 0; j < Horizontal; j++ {
-			draw.Draw(m, image.Rect(j*Side, i*Side, (j+1)*Side, (i+1)*Side),
-				s.m, Tile(strip.seq[j]).Min, draw.Src)
-		}
+		/*
+			for j := 0; j < Horizontal; j++ {
+				draw.Draw(m, image.Rect(j*Side, i*Side, (j+1)*Side, (i+1)*Side),
+					s.m, Tile(strip.seq[j]).Min, draw.Src)
+			}
+		*/
 	}
-	toFile(m, "jake.jpg")
 
 	stripSet := s.Descramble(strips)
-	m = image.NewRGBA(image.Rect(0, 0, Width, Height))
+	m := image.NewRGBA(image.Rect(0, 0, Width, Height))
 	for i, strip := range stripSet.seq {
 		for j, tile := range strips[strip].seq {
 			draw.Draw(m, Tile(Horizontal*i+j), s.m, Tile(tile).Min, draw.Src)
 		}
 	}
-	toFile(m, "jake2.jpg")
-}
 
-func toFile(m image.Image, outFile string) {
-	w, err := os.OpenFile(outFile, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		log.Fatalf("could not open file for writing: %v\n", outFile)
-	}
-	defer w.Close()
-	opts := &jpeg.Options{100}
-	jpeg.Encode(w, m, opts)
+	opts := &jpeg.Options{Quality: 100}
+	return jpeg.Encode(w, m, opts)
 }

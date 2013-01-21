@@ -1,8 +1,9 @@
 package main
 
 import (
-	"decrazifier"
+	"decrazifier/algo"
 	"flag"
+	"log"
 	"os"
 )
 
@@ -20,11 +21,15 @@ func main() {
 		log.Fatalf("Could not open file: %v\n", err.Error())
 	}
 
+	outFile := "output.jpg"
 	w, err := os.OpenFile(outFile, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		log.Fatalf("could not open file for writing: %v\n", outFile)
 	}
 	defer w.Close()
 
-	process(file, w)
+	err = algo.Decrazify(file, w)
+	if err != nil {
+		log.Fatalf("An error occurred: %v\n", err.Error())
+	}
 }
